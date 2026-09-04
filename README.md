@@ -54,9 +54,11 @@ Evaluating Python expression, converting it to a string and outputting to
 rendered content:
 
 * `{{<expr>}}`
+* `{[<expr>]}`
 
 Where `expr` is an arbitrary Python expression - from a bare variable name,
-to function calls, `yield from`/`await` expressions, etc.
+to function calls, `yield from`/`await` expressions, etc.  The `{[]}` form
+HTML escapes the result to remove dangerous HTML characters.
 
 Supported statements:
 

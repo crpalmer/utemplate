@@ -9,6 +9,8 @@ class Compiler:
     STMNT_END = "%}"
     EXPR = "{"
     EXPR_END = "}}"
+    ESCAPED_EXPR = "["
+    ESCAPED_EXPR_END = "]}"
 
     def __init__(self, file_in, file_out, indent=0, seq=0, loader=None):
         self.file_in = file_in
@@ -20,6 +22,10 @@ class Compiler:
         self.in_literal = False
         self.flushed_header = False
         self.args = "*a, **d"
+        single_quote = "'"
+        double_quote = '"'
+        if seq == 0:
+            self.file_out.write(f"def escape_html(s):\n\treturn s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('{double_quote}', '&quot;').replace({double_quote}'{double_quote}, '&#039;')\n")
 
     def indent(self, adjust=0):
         if not self.flushed_header:
@@ -46,6 +52,10 @@ class Compiler:
     def render_expr(self, e):
         self.indent()
         self.file_out.write('yield str(' + e + ')\n')
+
+    def render_escaped_expr(self, e):
+        self.indent()
+        self.file_out.write('yield escape_html(str(' + e + '))\n')
 
     def parse_statement(self, stmt):
         tokens = stmt.split(None, 1)
@@ -126,6 +136,14 @@ class Compiler:
                 expr = l[start + len(self.START_CHAR + self.EXPR):end].strip()
                 self.render_expr(expr)
                 end += len(self.EXPR_END)
+                l = l[end:]
+            elif sel == self.ESCAPED_EXPR:
+    #            print("EXPR")
+                end = l.find(self.ESCAPED_EXPR_END)
+                assert end > 0
+                expr = l[start + len(self.START_CHAR + self.ESCAPED_EXPR):end].strip()
+                self.render_escaped_expr(expr)
+                end += len(self.ESCAPED_EXPR_END)
                 l = l[end:]
             else:
                 self.literal(l[start])
