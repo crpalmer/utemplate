@@ -1,6 +1,6 @@
 # (c) 2014-2019 Paul Sokolovsky. MIT license.
 from . import compiled
-
+import json
 
 class Compiler:
 
@@ -12,7 +12,7 @@ class Compiler:
     ESCAPED_EXPR = "["
     ESCAPED_EXPR_END = "]}"
 
-    def __init__(self, file_in, file_out, indent=0, seq=0, loader=None):
+    def __init__(self, file_in, file_out, indent=0, seq=0, sources=[], loader=None):
         self.file_in = file_in
         self.file_out = file_out
         self.loader = loader
@@ -22,6 +22,7 @@ class Compiler:
         self.in_literal = False
         self.flushed_header = False
         self.args = "*a, **d"
+        self.sources = sources
         single_quote = "'"
         double_quote = '"'
         if seq == 0:
@@ -83,9 +84,11 @@ class Compiler:
                 self.file_out.write("yield from _.render(%s)\n" % args)
                 return
 
-            with self.loader.input_open(tokens[0][1:-1]) as inc:
+            filename = tokens[0][1:-1]
+            with self.loader.input_open(filename) as inc:
                 self.seq += 1
-                c = Compiler(inc, self.file_out, len(self.stack) + self._indent, self.seq)
+                self.sources.append(filename)
+                c = Compiler(inc, self.file_out, len(self.stack) + self._indent, self.seq, sources=self.sources)
                 inc_id = self.seq
                 self.seq = c.compile()
             self.indent()
@@ -182,9 +185,11 @@ class Loader(compiled.Loader):
                 self.pkg_path = p.__path__[0]
             self.pkg_path += "/"
 
+    def input_filename(self, template):
+        return self.pkg_path + self.dir + "/" + template
+
     def input_open(self, template):
-        path = self.pkg_path + self.dir + "/" + template
-        return open(path)
+        return open(self.input_filename(template))
 
     def compiled_path(self, template):
         return self.dir + "/" + template.replace(".", "_") + ".py"
@@ -199,8 +204,11 @@ class Loader(compiled.Loader):
 
         f_in = self.input_open(name)
         f_out = open(compiled_path, "w")
-        c = Compiler(f_in, f_out, loader=self)
+        sources = [name]
+        c = Compiler(f_in, f_out, sources=sources, loader=self)
         c.compile()
+        with open(self.input_filename(name) + ".deps", "w") as f:
+            json.dump(sources, f)
         f_in.close()
         f_out.close()
         return super().load(name)
